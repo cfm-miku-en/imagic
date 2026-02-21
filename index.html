@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Imagic</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;600&display=swap" rel="stylesheet">
+<style>
+body { font-family: 'Inter', sans-serif; margin:0; padding:0; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; min-height:100vh; transition: background 0.3s, color 0.3s; }
+header { width:100%; padding:1em; display:flex; flex-direction:column; align-items:center; box-sizing:border-box; }
+#title { font-size:4em; font-weight:100; font-style:italic; text-align:center; margin-bottom:0.2em; }
+.theme-switch { display:flex; align-items:center; gap:0.5em; font-weight:600; margin-bottom:1em; }
+.toggle-container { position: relative; display:inline-block; width:60px; height:30px; }
+.toggle-container input { display:none; }
+.toggle-slider { position:absolute; top:0; left:0; right:0; bottom:0; background:#ccc; border-radius:15px; transition:.4s; }
+.toggle-slider:before { position:absolute; content:""; height:26px; width:26px; left:2px; bottom:2px; background:white; transition:.4s; border-radius:50%; }
+input:checked + .toggle-slider { background:#2196F3; }
+input:checked + .toggle-slider:before { transform:translateX(30px); }
+main { display:flex; flex-direction:column; align-items:center; gap:1em; margin-top:2em; width:90%; max-width:700px; box-sizing:border-box; }
+.dropzone { width:100%; border:2px dashed; padding:2em; text-align:center; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+select, button { padding:0.6em; font-size:1em; }
+.download { margin-top:1em; text-align:center; word-break:break-word; }
+.progress-container { width:100%; background:#ccc; height:20px; border-radius:10px; overflow:hidden; margin-top:0.5em; display:none; }
+.progress-bar { height:100%; width:0%; background:#2196F3; transition:width 0.1s; }
+#preview { max-width:100%; max-height:300px; margin-top:1em; display:none; border:1px solid #999; }
+#audioPreview { margin-top:1em; display:none; }
+.dark { background:#121212; color:#f5f5f5; }
+.light { background:#ffffff; color:#121212; }
+</style>
+</head>
+<body class="dark">
+
+<header>
+  <div id="title">Imagic</div>
+  <div class="theme-switch">
+    <span>Dark</span>
+    <label class="toggle-container">
+      <input type="checkbox" id="themeToggle">
+      <span class="toggle-slider"></span>
+    </label>
+    <span>Light</span>
+  </div>
+</header>
+
+<main>
+  <div class="dropzone" id="dropzone">Drop your file here or click to select</div>
+  <input type="file" id="fileInput" style="display:none">
+
+  <select id="conversionType">
+    <option value="png-wav">PNG → WAV</option>
+    <option value="jpeg-mp3">JPEG → MP3</option>
+    <option value="mp3-jpg">MP3 → JPEG</option>
+    <option value="wav-png">WAV → PNG</option>
+    <option value="flac-bmp">FLAC → BMP</option>
+    <option value="ogg-jpg">OGG → JPEG</option>
+    <option value="bmp-wav">BMP → WAV</option>
+    <option value="gif-mp3">GIF → MP3</option>
+    <option value="tiff-wav">TIFF → WAV</option>
+  </select>
+
+  <button onclick="convert()">Convert!</button>
+
+  <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+
+  <div class="download" id="downloadArea"></div>
+
+  <img id="preview">
+  <audio id="audioPreview" controls></audio>
+</main>
+
+<script>
+let file;
+const themeToggle = document.getElementById('themeToggle');
+themeToggle.addEventListener('change', () => {
+  document.body.classList.toggle('dark');
+  document.body.classList.toggle('light');
+});
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const previewImg = document.getElementById('preview');
+const audioPreview = document.getElementById('audioPreview');
+const progressBar = document.getElementById('progressBar');
+const progressContainer = document.querySelector('.progress-container');
+const conversionSelect = document.getElementById('conversionType');
+
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => loadFile(e.target.files[0]));
+dropzone.addEventListener('drop', e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]); });
+dropzone.addEventListener('dragover', e => e.preventDefault());
+
+function updateAcceptFilter() {
+  const [inputType] = conversionSelect.value.split('-');
+  let accept = '';
+  if (['png','jpeg','bmp','gif','tiff'].includes(inputType)) accept = 'image/*';
+  else if (['wav','mp3','flac','ogg'].includes(inputType)) accept = 'audio/*';
+  fileInput.accept = accept;
+  previewImg.style.display = 'none';
+  audioPreview.style.display = 'none';
+  document.getElementById('downloadArea').innerHTML='';
+}
+conversionSelect.addEventListener('change', updateAcceptFilter);
+updateAcceptFilter();
+
+function loadFile(f) {
+  if (!f) return;
+  const [inputType] = conversionSelect.value.split('-');
+  if (['wav','mp3','flac','ogg'].includes(inputType) && !f.type.startsWith('audio/')) { alert('Invalid file type!'); return; }
+  if (['png','jpeg','bmp','gif','tiff'].includes(inputType) && !f.type.startsWith('image/')) { alert('Invalid file type!'); return; }
+
+  file = f;
+  previewImg.style.display = 'none';
+  audioPreview.style.display = 'none';
+
+  if (f.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = e => { previewImg.src = e.target.result; previewImg.style.display='block'; }
+    reader.readAsDataURL(f);
+  } else if (f.type.startsWith('audio/')) {
+    const reader = new FileReader();
+    reader.onload = e => { audioPreview.src = e.target.result; audioPreview.style.display='block'; }
+    reader.readAsDataURL(f);
+  }
+}
+
+async function convert() {
+  if (!file) return alert('Select a file first!');
+  const [inputType, outputType] = conversionSelect.value.split('-');
+  const name = file.name.split('.')[0];
+  const data = await file.arrayBuffer();
+  const bytes = new Uint8Array(data);
+
+  progressContainer.style.display = 'block';
+  progressBar.style.width = '0%';
+
+  let progress = 0;
+  const increment = 2;
+  const stepDelay = 10;
+
+  const smoothProgress = () => new Promise(resolve => {
+    const interval = setInterval(() => {
+      progress += increment;
+      if (progress > 100) { progress=100; clearInterval(interval); resolve(); }
+      progressBar.style.width = progress + '%';
+    }, stepDelay);
+  });
+
+  if (['wav-png','flac-bmp','mp3-jpg','ogg-jpg','bmp-wav'].includes(conversionSelect.value)) {
+    await smoothProgress();
+
+    let min=255,max=0;
+    for(let i=0;i<bytes.length;i++){ if(bytes[i]<min) min=bytes[i]; if(bytes[i]>max) max=bytes[i]; }
+    const normalized = bytes.map(b=>Math.floor((b-min)/(max-min)*255));
+    const size = Math.ceil(Math.sqrt(normalized.length/3));
+    const canvas = document.createElement('canvas');
+    canvas.width=size; canvas.height=size;
+    const ctx=canvas.getContext('2d');
+    const imgData=ctx.createImageData(size,size);
+    for(let i=0;i<size*size;i++){
+      const idx=i*4, dataIdx=i*3;
+      imgData.data[idx]=normalized[dataIdx]||0;
+      imgData.data[idx+1]=normalized[dataIdx+1]||0;
+      imgData.data[idx+2]=normalized[dataIdx+2]||0;
+      imgData.data[idx+3]=255;
+    }
+    ctx.putImageData(imgData,0,0);
+    canvas.toBlob(blob=>{
+      const url=URL.createObjectURL(blob);
+      document.getElementById('downloadArea').innerHTML=`<a href="${url}" download="${name}.png">Download ${name}.png</a>`;
+      previewImg.src=url;
+      previewImg.style.display='block';
+      progressContainer.style.display='none';
+    },'image/png');
+    return;
+  }
+
+  await smoothProgress();
+
+  const audioBuffer = new Int16Array(bytes.length);
+  for (let i=0;i<bytes.length;i++) audioBuffer[i]=bytes[i]-128;
+
+  const header = new ArrayBuffer(44);
+  const view = new DataView(header);
+  const writeString = (v,o,str)=>{for(let i=0;i<str.length;i++) v.setUint8(o+i,str.charCodeAt(i));}
+  writeString(view,0,'RIFF'); view.setUint32(4,36+audioBuffer.length*2,true);
+  writeString(view,8,'WAVE'); writeString(view,12,'fmt '); view.setUint32(16,16,true);
+  view.setUint16(20,1,true); view.setUint16(22,1,true); view.setUint32(24,44100,true);
+  view.setUint32(28,44100*2,true); view.setUint16(32,2,true); view.setUint16(34,16,true);
+  writeString(view,36,'data'); view.setUint32(40,audioBuffer.length*2,true);
+
+  const wavBlob = new Blob([header,audioBuffer.buffer],{type:'audio/wav'});
+  const url = URL.createObjectURL(wavBlob);
+  document.getElementById('downloadArea').innerHTML=`<a href="${url}" download="${name}.wav">Download ${name}.wav</a>`;
+  audioPreview.src = url;
+  audioPreview.style.display='block';
+  progressContainer.style.display='none';
+}
+</script>
+
+</body>
+</html>
